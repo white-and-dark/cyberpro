@@ -1,43 +1,73 @@
 #!/bin/bash
+# Script Name: preprocess
+# Author: Your Name
+# Creation Date: 2023-05-18
 
-# Check if file exists
-if [ ! -f "$1" ]; then
-    echo "File not found!"
-    exit 1
-fi
+# display usage instructions
+function display_help() {
+    echo "Usage: $0 [file]"
+    echo
+    echo "Example:"
+    echo "  $0 Cyber_Security_Breaches_noym.tsv"
+}
 
-# Print the header
-echo -e "Name_of_Covered_Entity\tState\tIndividuals_Affected\tDate_of_Breach\tType_of_Breach\tMonth\tYear"
+# Function: check input file exists
+function check_input_file_exists_func() {
+    local input_file=$1
+    if [ ! -f "$input_file" ]; then
+        echo "Error: input_file $input_file not found!" >&2
+        display_help
+        exit 1
+    fi
+}
 
-# Use awk to process the file
-awk -F'\t' 'BEGIN {OFS=FS} 
-    NR>1 {
-        # Check if the row has the correct number of fields
-        # if (NF != 7) {
-        #     next;
-        # }
+# Function: print the header
+function print_header_func() {
+    echo -e "Name_of_Covered_Entity\tState\tIndividuals_Affected\tDate_of_Breach\tType_of_Breach\tMonth\tYear"
+}
 
-        # Extract month and year from Date_of_Breach
-        split($4, range, "-");
-        split(range[1], date, "/");
-        month = date[1] + 0; # convert to number to remove leading zeros
-        year = date[3];
-        if(length(year)==2) {
-            if(year >= 00 && year <= 18) {
-                year = "20" year;
-            } else {
-                year = "19" year;
+# Function: process the input_file
+function preprocess_input_file_func() {
+    local input_file=$1
+    
+    awk -F'\t' 'BEGIN {OFS=FS} 
+        NR>1 {
+            # first, extract month and year
+            split($4, range, "-")
+            split(range[1], date, "/")
+            
+            # second, convert
+            month = date[1] + 0  # convert to num
+            year = date[3]
+            if(length(year)==2) {
+                if(year >= 00 && year <= 18) {
+                    year = "20" year
+                } else {
+                    year = "19" year
+                }
+            }  # convert year format
+
+            # third, Check: month and year are valid
+            if (month < 1 || month > 12 || year < 1900 || year > 2099) {
+                printf "Error: Invalid date on line %d\n", NR > "/dev/stderr"
+                next
             }
-        } # convert 2-digit year to 4-digit
 
-        # Check if month and year are valid
-        if (month < 1 || month > 12 || year < 1900 || year > 2099) {
-            next;
-        }
+            # fourth, remove operation
+            sub(/[,\/].*/, "", $5)
+            
+            # fifth, print result
+            print $1, $2, $3, $4, $5, month, year
+        }' "$input_file" | sed 's/[[:space:]]*$//'
+}
 
-        # Remove everything after the first comma or slash in Type_of_Breach
-        sub(/[,\/].*/, "", $5);
+# Main function
+function main() {
+    local input_file=$1
+    check_input_file_exists_func "$input_file"
+    print_header_func
+    preprocess_input_file_func "$input_file"
+}
 
-        # Print the required fields
-        print $1, $2, $3, $4, $5, month, year;
-    }' "$1" | sed 's/[[:space:]]*$//'
+# Call main function
+main "$@"
