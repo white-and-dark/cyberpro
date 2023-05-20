@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Check if file exists
+if [ ! -f "$1" ]; then
+    echo "File not found!"
+    exit 1
+fi
+
+# Print the header
+echo -e "Name_of_Covered_Entity\tState\tIndividuals_Affected\tDate_of_Breach\tType_of_Breach\tMonth\tYear"
+
+# Use awk to process the file
+awk -F'\t' 'BEGIN {OFS=FS} 
+    NR>1 {
+        # Check if the row has the correct number of fields
+        # if (NF != 7) {
+        #     next;
+        # }
+
+        # Extract month and year from Date_of_Breach
+        split($4, range, "-");
+        split(range[1], date, "/");
+        month = date[1] + 0; # convert to number to remove leading zeros
+        year = date[3];
+        if(length(year)==2) {
+            if(year >= 00 && year <= 18) {
+                year = "20" year;
+            } else {
+                year = "19" year;
+            }
+        } # convert 2-digit year to 4-digit
+
+        # Check if month and year are valid
+        if (month < 1 || month > 12 || year < 1900 || year > 2099) {
+            next;
+        }
+
+        # Remove everything after the first comma or slash in Type_of_Breach
+        sub(/[,\/].*/, "", $5);
+
+        # Print the required fields
+        print $1, $2, $3, $4, $5, month, year;
+    }' "$1" | sed 's/[[:space:]]*$//'
