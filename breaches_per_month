@@ -1,0 +1,48 @@
+#!/bin/bash
+
+# Check if file name is provided
+if [ $# -eq 0 ]
+then
+    echo "No arguments supplied. Please provide the file name."
+    exit 1
+fi
+
+# File name
+file=$1
+
+# Calculate incidents per month
+incidents_per_month=$(tail -n +2 $file | awk -F'\t' '{print $6}' | sort | uniq -c | sort -k1n)
+
+# Calculate median
+median=$(echo "$incidents_per_month" | awk '{arr[NR]=$1} END{if(NR%2==1) print arr[(NR+1)/2]; else print (arr[(NR/2)]+arr[(NR/2)+1])/2}')
+echo "median": $median
+
+# Calculate MAD
+mad=$(echo "$incidents_per_month" | awk -v median=$median '{arr[NR]=($1-median>=0)?$1-median:median-$1} END{for(i=1;i<=NR;i++) print arr[i]}' | sort -n | awk '{arr[NR]=$1} END{if(NR%2==1) print arr[(NR+1)/2]; else print (arr[(NR/2)]+arr[(NR/2)+1])/2}')
+echo "mad":$mad
+echo 
+
+# Print table header
+echo -e "Month\tIncidents\tStatus"
+echo "-----------------------------------"
+
+# Print results
+for i in {1..12}
+do
+    incidents=$(echo "$incidents_per_month" | awk -v month=$i '$2==month {print $1}')
+    if [ -z "$incidents" ]
+    then
+        incidents=0
+    fi
+    month_name=$(date -d "2000-$i-01" '+%b')
+    printf "%s\t%s\t" $month_name $incidents
+    if (( $(echo "$incidents > $median + $mad" | bc -l) ))
+    then
+        echo "++"
+    elif (( $(echo "$incidents < $median - $mad" | bc -l) ))
+    then
+        echo "--"
+    else
+        echo
+    fi
+done
